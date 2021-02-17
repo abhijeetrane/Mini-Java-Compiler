@@ -1,0 +1,493 @@
+options
+{
+  STATIC = true;		// This is the default.
+}
+
+
+/*
+ * Class Specification
+ */
+
+PARSER_BEGIN(AbhiLang)
+import visitor.*;
+public class AbhiLang{
+    public static void main(String[] args) {
+      AbhiLang parser;
+      if (args.length == 0) {
+        System.out.println("AbhiLang Parser:  Reading from standard input . . .");
+        parser = new AbhiLang(System.in);
+      } else if (args.length == 1) {
+        System.out.println("AbhiLang Parser:  Reading from file " + args[0] + " . . .");
+        try {
+          parser = new AbhiLang(new java.io.FileInputStream(args[0]));
+        } catch (java.io.FileNotFoundException e) {
+          System.out.println("AbhiLang Parser:  File " + args[0] + " not found.");
+          return;
+        }
+      } else {
+        System.out.println("AbhiLang Parser:  Usage is one of:");
+        System.out.println("         java AbhiLang < inputfile");
+        System.out.println("OR");
+        System.out.println("         java AbhiLang inputfile");
+        return;
+      }
+      try {
+        Program prog = parser.Program();
+         System.out.println("AbhiLang Parser: MiniJava program parsed successfully.");
+         SymbolTableVisitor stv = new SymbolTableVisitor();
+         prog.accept(stv);
+         TypeCheckVisitor tcv = new TypeCheckVisitor(stv.symTable);
+         prog.accept(tcv);
+      } catch (ParseException e) {
+        System.out.println(e.getMessage());
+        System.out.println("AbhiLang Parser:  Encountered errors during parse.");
+    }
+ }
+  
+}
+PARSER_END(AbhiLang)
+
+/*
+ * Lexical Specification - The "words".
+ */
+
+TOKEN_MGR_DECLS:
+{
+}
+
+
+/* WHITE SPACE */
+
+SKIP :
+{
+  " "
+| "\t"
+| "\n"
+| "\r"
+| "\f"
+}
+
+SPECIAL_TOKEN : /* COMMENTS */
+{
+  <SINGLE_LINE_COMMENT: "//" (~["\n","\r"])* ("\n"|"\r"|"\r\n")>
+  | <MULTI_LINE_COMMENT:"/*" (~["*"])* "*" ("*" | (~["*","/"] (~["*"])* "*"))* "/">
+ }
+
+/* SEPARATORS */
+
+TOKEN :
+{
+  < LPAREN: "(" >
+| < RPAREN: ")" >
+| < LBRACE: "{" >
+| < RBRACE: "}" >
+| < LBRACKET: "[" >
+| < RBRACKET: "]" >
+| < SEMICOLON: ";" >
+| < COMMA: "," >
+| < DOT: "." >
+}
+
+
+
+/* OPERATORS */
+
+TOKEN :
+{
+
+  < LT: "<" >
+| < NOT: "!" >
+| < AND: "&&" >
+| < PLUS: "+" >
+| < MINUS: "-" >
+| < STAR: "*" >
+| < ASSIGN: "=" >
+}
+
+/* JAVA RESERVED WORDS AND LITERALS */
+
+TOKEN :
+{
+
+  < BOOLEAN: "boolean" >
+| < CLASS: "class" >
+| < ELSE: "else" >
+| < EXTENDS: "extends" >
+| < FALSE: "false" >
+| < IF: "if" >
+| < INT: "int" >
+| < LENGTH: "length">
+| < NEW: "new" >
+| < MAIN: "main">
+| < PUBLIC: "public" >
+| < PRINT: "System.out.println">
+| < STATIC: "static" >
+| < STRING: "String">
+| < THIS: "this" >
+| < TRUE: "true" >
+| < VOID: "void" >
+| < WHILE: "while" >
+| < RETURN: "return">
+}
+
+
+// Literals
+TOKEN:
+{
+ <INTEGER_LITERAL: (["0"-"9"])+>
+}
+
+//Identifiers
+TOKEN:
+{
+ <IDENTIFIER: ["a"-"z","A"-"Z"](["a"-"z","A"-"Z","0"-"9","_"])* >
+}
+
+
+
+/*****************************************
+ * THE MINI JAVA LANGUAGE GRAMMAR STARTS HERE *
+ *****************************************/
+
+
+
+
+
+
+void Program():
+{}
+{
+  MainClass() ( ClassDecl() )* <EOF> 
+}
+
+
+
+void MainClass():
+{}
+{
+ <CLASS> ID() <LBRACE> <PUBLIC> <STATIC> <VOID> <MAIN> <LPAREN> <STRING> <LBRACKET> <RBRACKET> ID() <RPAREN> <LBRACE> Statement() <RBRACE> <RBRACE> 
+
+}
+
+/****Lookahead of 3 is required since the two productions begin with non-terminals CLASS ID *******/
+
+
+void ClassDecl():
+{}
+{
+LOOKAHEAD(3)
+ClassDeclSimple()|ClassDeclExtends()
+
+ }
+void ClassDeclSimple():
+{}
+{
+  <CLASS> ID() <LBRACE> ( VarDecl() )* ( MethodDecl() )* <RBRACE> 
+}
+
+void ClassDeclExtends():
+{}
+{
+  <CLASS> ID() <EXTENDS> ID() <LBRACE> ( VarDecl() )* ( MethodDecl() )* <RBRACE> 
+}
+
+void VarDecl():
+{}
+{
+  Type() ID() <SEMICOLON> 
+}
+
+void MethodDecl():
+{}
+{
+  <PUBLIC> Type() ID() <LPAREN>(FormalList())*<RPAREN> <LBRACE> (LOOKAHEAD(2)VarDecl())* (Statement())* <RETURN> Exp() <SEMICOLON> <RBRACE> 
+}
+
+void FormalList():
+{}
+{
+   Type() ID()(FormalRest())*
+}
+
+void FormalRest():
+{}
+{
+<COMMA> Type() ID()
+}
+
+
+/****Lookahead of 2 is required since the two productions begin with terminal int *******/
+void Type():
+{}
+{
+LOOKAHEAD(2)
+IntArrayType()
+|BooleanType()
+|IntegerType()
+|IdentifierType()
+}
+
+
+void IntArrayType():
+{}
+{
+<INT> <LBRACKET> <RBRACKET> 
+}
+void BooleanType():
+{}
+{
+<BOOLEAN> 
+}
+void IntegerType():
+{}
+{
+<INT>
+}
+void IdentifierType():
+{}
+{
+<IDENTIFIER>
+}
+
+ 
+ 
+
+/****Lookahead of 2 is required since the two productions begin with non-terminal ID() *******/
+
+void Statement() :
+{}
+{
+
+  Block()
+|
+  IfStatement()
+|
+  WhileStatement()
+|
+  StatementPrint()
+|
+ LOOKAHEAD(2) Assign()
+|
+  ArrayAssign()
+}
+
+void Block() :
+{}
+{
+  "{" StatementList() "}"
+}
+
+void StatementList() :
+{}
+{
+   (Statement())*
+}
+
+void IfStatement() :
+{}
+{
+  <IF> <LPAREN> Exp() <RPAREN> Statement()  <ELSE> Statement() 
+}
+
+void WhileStatement() :
+{}
+{
+  <WHILE> <LPAREN> Exp() <RPAREN> Statement() 
+}
+void StatementPrint():
+{}
+{
+<PRINT> <LPAREN> Exp() <RPAREN> <SEMICOLON> 
+}
+void Assign():
+{}
+{
+ID() <ASSIGN> Exp() <SEMICOLON> 
+}
+
+void ArrayAssign():
+{}
+{
+ID() <LBRACKET> Exp() <RBRACKET> <ASSIGN> Exp() <SEMICOLON> 
+}
+
+
+/**** Converting an Ambiguous grammer to Unambiguous grammer and then removing left recursion***********/
+
+
+void Exp():
+{}
+{
+  ExpFirst() ( ExpFirstAdjacent() )*
+ }
+
+void ExpFirstAdjacent():
+{}
+{
+ <AND> ExpFirst()
+}
+  
+ void ExpFirst():
+ {}
+ {
+  ExpSecond() (ExpSecondAdjacent() )*
+ }
+ 
+void ExpSecondAdjacent():
+{}
+ {
+<LT> ExpSecond()
+}
+
+ void ExpSecond():
+ {}
+ {
+   Term() ( TermAdjacent() )*
+ }
+
+void TermAdjacent():
+{}
+{
+AddMinus()Term()
+}
+
+void AddMinus():
+{}
+{
+ <PLUS> | <MINUS>  
+}
+ 
+ void Term():
+ {}
+ {
+    Factor() ( FactorAdjacent() )*
+ }
+
+void FactorAdjacent():
+{}
+{
+<STAR> Factor()
+}
+ 
+ void Factor():
+ {}
+   {
+   Not() | Elements()
+ }
+ 
+ void Not():
+ {}
+ {
+  ( <NOT> )+ Elements()
+ }
+ 
+ 
+ /****Lookahead of 2 is required since the two productions begin with terminal dot *******/
+ 
+void Elements():
+{}
+{
+TerminalExp()(PostExp())*
+}
+
+void PostExp():
+{}
+{
+ArrayLookup()|LOOKAHEAD(2)Call()|ArrayLength()
+}
+void ArrayLookup():
+{}
+{
+<LBRACKET> Exp() <RBRACKET>
+}
+
+void Call():
+{}
+{
+<DOT> ID()<LPAREN> [ExpList()] <RPAREN> 
+}
+
+void ArrayLength():
+{}
+{
+<DOT> <LENGTH>
+}
+
+
+ 
+ /****Lookahead of 2 is required since two productions begin with terminal new *******/
+ 
+ void TerminalExp():
+ {}
+ {
+ IntegerLiteral()
+ |True()
+ |False()
+ |IdentifierExp()
+ |This()
+ |ParenExp()
+ |LOOKAHEAD(2)NewArray()
+ |NewObject()
+ }
+ 
+ void IntegerLiteral():
+ {}
+ {
+  <INTEGER_LITERAL>
+  }
+ void True():
+ {}
+  {
+ <TRUE>
+ }
+ void False():
+ {}
+ {
+ <FALSE>
+ }
+ void IdentifierExp():
+ {}
+ {
+ <IDENTIFIER>
+ }
+ void This():
+ {}
+  {
+  <THIS>
+ }
+ 
+ void ParenExp():
+ {}
+ {
+ <LPAREN> Exp() <RPAREN>
+ }
+ 
+ void NewArray():
+ {}
+ {
+ <NEW> <INT> <LBRACKET> Exp() <RBRACKET>
+ }
+ void NewObject():
+ {}
+ {
+ <NEW> ID() <LPAREN> <RPAREN>
+ }
+ 
+ 
+void ExpList():
+ {}
+ {
+  Exp() (ExpRest())* 
+ }
+ 
+ void ExpRest():
+ {}
+ {
+  <COMMA> Exp() 
+  }
+ 
+void ID() :
+{}
+{
+  <IDENTIFIER>
+}
